@@ -22,6 +22,29 @@ class handler(BaseHTTPRequestHandler):
         provider_name = query.get("provider_name", [""])[0]
         provider_url = query.get("provider_url", ["https://google.com"])[0]
 
+        # Discord unfurls this page by reading the og:*/twitter:* tags below -
+        # it isn't a real embed object, so there's no native "author" or
+        # "footer" slot the way a bot-sent embed has. author_name/footer_text/
+        # timestamp are folded into the visible description text instead,
+        # stacked the way a real embed visually lays them out (author line on
+        # top, footer + timestamp on the bottom). author_icon has no OG/Twitter
+        # tag that renders as a small icon distinct from the main image, so it
+        # is accepted (for forward compatibility) but intentionally has no
+        # visual effect here - that's a hard limitation of link-preview
+        # embeds, not an oversight.
+        composed_description = description
+        if author_name:
+            composed_description = f"{author_name}\n{composed_description}"
+        footer_line = ""
+        if footer_text and timestamp:
+            footer_line = f"{footer_text} • {timestamp}"
+        elif footer_text:
+            footer_line = footer_text
+        elif timestamp:
+            footer_line = timestamp
+        if footer_line:
+            composed_description = f"{composed_description}\n\n{footer_line}"
+
         html = f"""
 <!DOCTYPE html>
 <html>
@@ -31,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="{title}">
-<meta property="og:description" content="{description}">
+<meta property="og:description" content="{composed_description}">
 <meta property="og:url" content="{url}">
 <meta property="og:image" content="{image}">
 <meta property="theme-color" content="#{color}">
@@ -39,7 +62,7 @@ class handler(BaseHTTPRequestHandler):
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{title}">
-<meta name="twitter:description" content="{description}">
+<meta name="twitter:description" content="{composed_description}">
 <meta name="twitter:image" content="{thumbnail or image}">
 
 <title>{title}</title>
